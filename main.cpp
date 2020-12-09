@@ -19,6 +19,16 @@
 #include <iostream>
 #include <random>
 
+static Eigen::MatrixXd V;
+static Eigen::MatrixXi F;
+static Eigen::VectorXd Z;
+static Eigen::MatrixXd boundary_segments;
+static uint32_t n_verts;
+static int max_steps;
+static int num_walks;
+static uint32_t num_updates;
+static bool use_camel;
+
 static float
 boundary_condition(const Eigen::Vector2d& x)
 {
@@ -51,7 +61,7 @@ closest_point_on_segment(const Eigen::MatrixXd& bs,
  * Pass a function g to evaluate on the boundary.
  */
 static float
-walk_on_spheres(const Eigen::Vector2d& x0,
+walk_on_circles(const Eigen::Vector2d& x0,
                 const Eigen::MatrixXd& bndary_segs,
                 const std::function<float(const Eigen::Vector2d&)> g,
                 int num_walks,
@@ -94,6 +104,43 @@ walk_on_spheres(const Eigen::Vector2d& x0,
         return accum / num_successful_walks;
 }
 
+static void
+update_Z(void)
+{
+        if (use_camel) {
+                for (int Vidx = 0; Vidx < V.rows(); ++Vidx) {
+                }
+        } else {
+                const auto walk_on_circles_parallel = [&](const int Vidx) {
+                        float u =
+                          walk_on_circles(Eigen::Vector2d{ V(Vidx, 0), V(Vidx, 1) },
+                                          boundary_segments,
+                                          boundary_condition,
+                                          num_walks,
+                                          max_steps);
+                        Z(Vidx) = u;
+                };
+                igl::parallel_for(V.rows(), walk_on_circles_parallel, 48);
+        }
+        ++num_updates;
+}
+
+static bool
+key_down(igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier)
+{
+        if (key == '1') {
+                Eigen::VectorXd Z_cma = Z;
+                update_Z();
+                Z = (((num_updates - 1) * Z_cma) + Z) / num_updates;
+                viewer.data().set_data(Z, igl::COLOR_MAP_TYPE_TURBO, 256);
+        } else if (key == '2') {
+                num_updates = 0;
+                update_Z();
+                viewer.data().set_data(Z, igl::COLOR_MAP_TYPE_TURBO, 256);
+        }
+        return false;
+}
+
 int
 main(int argc, char** argv)
 {
@@ -121,20 +168,17 @@ main(int argc, char** argv)
 
         auto result = options.parse(argc, argv);
 
-        uint32_t n_verts = result["nvertices"].as<uint32_t>();
+        n_verts = result["nvertices"].as<uint32_t>();
         bool do_linear_solve = result["do-linear-solve"].as<bool>();
         bool should_exit_before_gui = result["exit-before-gui"].as<bool>();
-        bool use_camel = result["use-camel"].as<bool>();
-        int max_steps = result["max-steps"].as<int>();
-        int num_walks = result["num-walks"].as<int>();
+        use_camel = result["use-camel"].as<bool>();
+        max_steps = result["max-steps"].as<int>();
+        num_walks = result["num-walks"].as<int>();
 
         uint32_t n_edges = n_verts - 1;
         double grid_spacing = 1.0 / n_verts;
 
-        Eigen::MatrixXd V;
         V.resize(n_verts * n_verts, 3);
-
-        Eigen::MatrixXi F;
         F.resize(2 * n_edges * n_edges, 3);
 
         if (use_camel) {
@@ -163,9 +207,16 @@ main(int argc, char** argv)
                                 F(Fidx, 2) = ((i + 1) * n_verts) + j;
                         }
                 }
+
+                boundary_segments.resize(5, 4);
+                boundary_segments << 0.5, 0.1, 0.9, 0.5, // x0, y0, x1, y1
+                  0.5, 0.9, 0.1, 0.5,                    //
+                  0.1, 0.5, 0.5, 0.1,                    //
+                  0.5, 0.333, 0.5, 0.667,                //
+                  0.333, 0.5, 0.667, 0.5;
         }
 
-        Eigen::VectorXd Z{ V.rows() };
+        Z.resize(V.rows());
         if (do_linear_solve) {
                 // Find boundary edges
                 Eigen::MatrixXi E;
@@ -216,31 +267,16 @@ main(int argc, char** argv)
         }
 
         /* NOTE(brendan): alternative with monte carlo */
-        Eigen::MatrixXd boundary_segments{ 5, 4 };
-        boundary_segments << 0.5, 0.1, 0.9, 0.5, // x0, y0, x1, y1
-          0.5, 0.9, 0.1, 0.5,                    //
-          0.1, 0.5, 0.5, 0.1,                    //
-          0.5, 0.333, 0.5, 0.667,                //
-          0.333, 0.5, 0.667, 0.5;
-
-        for (int i = 0; i < n_verts; ++i) {
-                for (int j = 0; j < n_verts; ++j) {
-                        uint32_t Vidx = (i * n_verts) + j;
-                        float u =
-                          walk_on_spheres(Eigen::Vector2d{ V(Vidx, 0), V(Vidx, 1) },
-                                          boundary_segments,
-                                          boundary_condition,
-                                          num_walks,
-                                          max_steps);
-                        Z(Vidx) = u;
-                }
-        }
+        update_Z();
 
         if (should_exit_before_gui)
                 std::exit(EXIT_SUCCESS);
 
         // Plot the mesh with pseudocolors
         igl::opengl::glfw::Viewer viewer;
+
+        viewer.callback_key_down = &key_down;
+
         viewer.data().set_mesh(V, F);
         viewer.data().show_lines = false;
         viewer.data().set_data(Z, igl::COLOR_MAP_TYPE_TURBO, 256);
