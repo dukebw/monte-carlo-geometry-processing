@@ -25,7 +25,7 @@ the expected value of the first point on the boundary reached by a random walk
 starting at p.
 By symmetry, we can find this boundary point by sampling uniformly on spheres.
 We start at x0, then successively sample boundary point until we get to `x_k`,
-which is within some threshold <img src="https://rawgit.com/dukebw/monte-carlo-geometry-processing/main/svgs/e545a3e80cb1165111423624206de470.svg?invert_in_darkmode" align=middle width=26.99150024999999pt height=22.831056599999986pt/> of the boundary (illustrated below).
+which is within some threshold <img src="./svgs/e545a3e80cb1165111423624206de470.svg?invert_in_darkmode" align=middle width=26.99150024999999pt height=22.831056599999986pt/> of the boundary (illustrated below).
 
 ![](images/mcgp-3-Figure3-1.png)
 (Figure 3 Sawhney & Crane 2020)
