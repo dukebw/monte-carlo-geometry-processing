@@ -17,9 +17,13 @@ The Monte Carlo approximation is noisy at first, but can be refined by taking mo
 
 In my implementation I focused on solving the Laplace equation.
 
-<p align="center"><img src="svgs/e0f5921388f2916eb14faff53a2a48b0.svg?invert_in_darkmode" align=middle width=101.647656pt height=11.232861749999998pt/></p>
+$$
+\Delta u = 0 \quad\textrm{on}\, \Omega
+$$
 
-<p align="center"><img src="svgs/3b35a6e7fc9f77fb6bc38ed0fcab03f8.svg?invert_in_darkmode" align=middle width=97.80053745pt height=14.611878599999999pt/></p>
+$$
+u = g\quad\textrm{on}\, \partial\Omega
+$$
 
 To solve the Laplace equation, Sawhney and Crane use a technique called "walk on spheres".
 The idea uses the fact that the solution of a harmonic function at point p is
@@ -27,7 +31,7 @@ the expected value of the first point on the boundary reached by a random walk
 starting at p.
 By symmetry, we can find this boundary point by sampling uniformly on spheres.
 We start at x0, then successively sample boundary point until we get to `x_k`,
-which is within some threshold <img src="svgs/e545a3e80cb1165111423624206de470.svg?invert_in_darkmode" align=middle width=26.99150024999999pt height=22.831056599999986pt/> of the boundary (illustrated below).
+which is within some threshold $\partial\Omega_\epsilon$ of the boundary (illustrated below).
 
 ![](images/mcgp-3-Figure3-1.png)
 (Figure 3 Sawhney & Crane 2020)

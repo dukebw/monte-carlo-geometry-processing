@@ -2,19 +2,11 @@
 #include "walk_on_circles.h"
 #include "walk_on_spheres.h"
 
-#include "Eigen/Sparse"
+#include "Eigen/Core"
 #include "cxxopts.hpp"
 #include "igl/boundary_facets.h"
-#include "igl/colon.h"
-#include "igl/cotmatrix.h"
-#include "igl/jet.h"
-#include "igl/min_quad_with_fixed.h"
 #include "igl/opengl/glfw/Viewer.h"
 #include "igl/readOFF.h"
-#include "igl/setdiff.h"
-#include "igl/slice.h"
-#include "igl/slice_into.h"
-#include "igl/unique.h"
 
 #include <algorithm>
 #include <cmath>
@@ -74,8 +66,10 @@ main(int argc, char** argv)
         cxxopts::Options options("Monte Carlo Geometry Processing",
                                  "Monte Carlo Geometry Processing on a plane");
 
-        options.add_options()                                                    //
-          ("n,nvertices", "Num vertices (per edge)", cxxopts::value<uint32_t>()) //
+        options.add_options() //
+          ("n,nvertices",
+           "Num vertices (per edge)",
+           cxxopts::value<uint32_t>()->default_value("256")) //
           ("e,exit-before-gui",
            "Exit before GUI",
            cxxopts::value<bool>()->default_value("false")) //
