@@ -11,5 +11,9 @@ option(LIBIGL_WITH_OPENGL_GLFW_IMGUI "Use IMGUI" ON)
 find_package(LIBIGL REQUIRED QUIET)
 
 file(GLOB SRCFILES *.cpp)
+
+add_library(core ${SRCFILES})
+target_link_libraries(core igl::core igl::opengl igl::opengl_glfw)
+
 add_executable(${PROJECT_NAME} main.cpp)
-target_link_libraries(${PROJECT_NAME} igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui)
+target_link_libraries(${PROJECT_NAME} core igl::core igl::opengl igl::opengl_glfw igl::opengl_glfw_imgui)

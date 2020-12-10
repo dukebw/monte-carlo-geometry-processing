@@ -1,6 +1,7 @@
 #define EIGEN_NO_DEBUG
-#include "./walk_on_circles.h"
-#include "./walk_on_spheres.h"
+#include "walk_on_circles.h"
+#include "walk_on_spheres.h"
+
 #include "Eigen/Sparse"
 #include "cxxopts.hpp"
 #include "igl/boundary_facets.h"
@@ -9,7 +10,6 @@
 #include "igl/jet.h"
 #include "igl/min_quad_with_fixed.h"
 #include "igl/opengl/glfw/Viewer.h"
-#include "igl/point_mesh_squared_distance.h"
 #include "igl/readOFF.h"
 #include "igl/setdiff.h"
 #include "igl/slice.h"
@@ -19,7 +19,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
-#include <iostream>
 #include <random>
 
 static Eigen::MatrixXf V;
@@ -33,156 +32,20 @@ static int num_walks;
 static uint32_t num_updates;
 static bool use_camel;
 
-/**
- * NOTE(brendan): Solve Laplace equation using walk on spheres in 3D.
- * Use the z coordinate of the boundary points as boundary condition.
- */
-static float
-walk_on_spheres(int Vidx)
-{
-
-        float stopping_tolerance = 0.05f;
-
-        std::random_device rd;
-        std::mt19937 gen{ rd() };
-        std::normal_distribution<float> dis{ 0.0f, 1.0f };
-
-        float accum = 0.0f;
-        int num_successful_walks = 0;
-        Eigen::Vector3f x0 = V.row(Vidx);
-        for (int i = 0; i < num_walks; i++) {
-                Eigen::MatrixXf x{ 1, 3 };
-                x.row(0) = x0;
-
-                for (int steps = 0; steps < max_steps; ++steps) {
-                        float radius = std::numeric_limits<float>::max();
-
-                        Eigen::VectorXf squared_distances;
-                        Eigen::VectorXi closest_edge;
-                        Eigen::MatrixXf closest_points;
-                        igl::point_mesh_squared_distance(x,
-                                                         V,
-                                                         boundary_edges,
-                                                         squared_distances,
-                                                         closest_edge,
-                                                         closest_points);
-
-                        radius = sqrtf(squared_distances(0));
-                        if (radius < stopping_tolerance) {
-                                accum += closest_points(0, 2);
-                                ++num_successful_walks;
-                                break;
-                        }
-
-                        /**
-                         * NOTE(brendan): sample from a three-dimensional Gaussian.
-                         * This is equivalent to sampling a 3-vector with a random
-                         * orientation in space.
-                         */
-                        Eigen::Vector3f dx{ dis(gen), dis(gen), dis(gen) };
-                        dx /= dx.norm() + 0.0001f;
-                        x.row(0) += radius * dx;
-                }
-        }
-
-        if (num_successful_walks == 0)
-                return 0.0f;
-
-        return accum / num_successful_walks;
-}
-
 static float
 boundary_condition(const Eigen::Vector2f& x)
 {
         return fmod((6.0f * x.array()).floor().sum(), 2.0f);
 }
 
-static float
-closest_point_on_segment(const Eigen::MatrixXf& bs,
-                         const Eigen::Vector2f& x,
-                         int seg_idx,
-                         float R)
-{
-        Eigen::Vector2f seg0{ bs(seg_idx, 0), bs(seg_idx, 1) };
-        Eigen::Vector2f seg1{ bs(seg_idx, 2), bs(seg_idx, 3) };
-
-        Eigen::Vector2f u = seg1 - seg0;
-        float t = ((x - seg0).transpose() * u);
-        t /= u.squaredNorm();
-        t = std::clamp(t, 0.0f, 1.0f);
-
-        Eigen::Vector2f p = ((1 - t) * seg0) + (t * seg1);
-        float distance = (x - p).norm();
-
-        return std::min(R, distance);
-}
-
-/**
- * NOTE(brendan): Solve Laplace equation using walk on spheres in 2D.
- * Give the boundary condition in piecewise segments (bndary_segs).
- * Pass a function g to evaluate on the boundary.
- */
-static float
-walk_on_circles(const Eigen::Vector2f& x0,
-                const Eigen::MatrixXf& bndary_segs,
-                const std::function<float(const Eigen::Vector2f&)> g,
-                int num_walks,
-                int max_steps)
-{
-        float stopping_tolerance = 0.01f;
-
-        std::random_device rd;
-        std::mt19937 gen{ rd() };
-        std::uniform_real_distribution<float> dis{ 0.0f, 2.0f * igl::PI };
-
-        float accum = 0.0f;
-        Eigen::Vector2f x;
-        int num_successful_walks = 0;
-        for (int i = 0; i < num_walks; i++) {
-                Eigen::Vector2f x = x0;
-                for (int steps = 0; steps < max_steps; ++steps) {
-                        float radius = std::numeric_limits<float>::max();
-                        for (int seg_idx = 0; seg_idx < bndary_segs.rows(); ++seg_idx) {
-                                radius = closest_point_on_segment(
-                                  bndary_segs, x, seg_idx, radius);
-                        }
-
-                        if (radius < stopping_tolerance) {
-                                accum += g(x);
-                                ++num_successful_walks;
-                                break;
-                        }
-
-                        float theta = dis(gen);
-                        x(0) += radius * cosf(theta);
-                        x(1) += radius * sinf(theta);
-                }
-        }
-
-        if (num_successful_walks == 0)
-                return 0.0f;
-
-        return accum / num_successful_walks;
-}
-
 static void
 update_Z(void)
 {
         if (use_camel) {
-                const auto walk_on_spheres_parallel = [&](const int Vidx) {
-                        Z(Vidx) = walk_on_spheres(Vidx);
-                };
-                igl::parallel_for(V.rows(), walk_on_spheres_parallel, 1000);
+                walk_on_spheres(Z, V, boundary_edges, num_walks, max_steps);
         } else {
-                const auto walk_on_circles_parallel = [&](const int Vidx) {
-                        Z(Vidx) =
-                          walk_on_circles(Eigen::Vector2f{ V(Vidx, 0), V(Vidx, 1) },
-                                          boundary_segments,
-                                          boundary_condition,
-                                          num_walks,
-                                          max_steps);
-                };
-                igl::parallel_for(V.rows(), walk_on_circles_parallel, 1000);
+                walk_on_circles(
+                  Z, V, boundary_segments, boundary_condition, num_walks, max_steps);
         }
         ++num_updates;
 }
