@@ -37,3 +37,14 @@ which is within some threshold $\partial\Omega_\epsilon$ of the boundary (illust
 ## Code
 
 I implemented two versions of walk on spheres: a 2D version `walk_on_circles` and a 3D version `walk_on_spheres`.
+I put their respective implementations in `walk_on_circles.h/cpp` and `walk_on_spheres.h/cpp`.
+Install the code with cmake as usual.
+Then, run the `walk_on_circles` code from `main.cpp` with the command line
+
+```
+./monte-carlo-geometry-processing --nvertices 256 --max-steps 16 --num-walks 8
+```.
+
+`nvertices` controls the number of vertices in the planar mesh, `max-steps` is
+the maximum number of walk on circles steps, and `num-walks` is the number of
+walks on circles per vertex.
