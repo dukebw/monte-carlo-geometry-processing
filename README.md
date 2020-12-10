@@ -18,7 +18,7 @@ The Monte Carlo approximation is noisy at first, but can be refined by taking mo
 In my implementation I focused on solving the Laplace equation.
 
 $$
-\Delta u = 0 \,\textrm{on}\,\Omega
+\Delta u = 0 \,\textrm{on}\,\Omega \\
 u = g \,\textrm{on}\,\partial\Omega
 $$
 
